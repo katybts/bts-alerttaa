@@ -1,54 +1,68 @@
 import time
 import requests
 import os
-import re
 
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
-URL = "https://www.allaccess.com.ar/event/bts"
+
+LINKS = {
+    "21": "https://www.allaccess.com.ar/event/bts-21-de-octubre",
+    "23": "https://www.allaccess.com.ar/event/bts-23-de-octubre",
+    "24": "https://www.allaccess.com.ar/event/bts-24-de-octubre"
+}
 
 def enviar_telegram(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
 
-# guardamos estado por fecha
-estado_fechas = {}
+estado_prev = {fecha: False for fecha in LINKS}
 
-def detectar_estado(bloque):
-    bloque = bloque.lower()
-    if "comprar" in bloque or "disponible" in bloque:
-        return "disponible"
-    elif "agotado" in bloque:
-        return "agotado"
-    return "sin info"
+def detectar_disponibilidad(texto):
+    texto = texto.lower()
+
+    # si dice comprar o disponible y NO agotado → posible disponibilidad real
+    if ("comprar" in texto or "disponible" in texto) and "agotado" not in texto:
+        return True
+    return False
+
+def detectar_sectores(texto):
+    texto = texto.lower()
+    sectores = []
+
+    posibles = ["campo", "platea", "cabecera", "vip"]
+
+    for s in posibles:
+        if s in texto:
+            sectores.append(s)
+
+    return list(set(sectores))
 
 while True:
     try:
-        r = requests.get(URL, headers={"User-Agent": "Mozilla/5.0"})
-        html = r.text.lower()
+        for fecha, link in LINKS.items():
+            r = requests.get(link, headers={"User-Agent": "Mozilla/5.0"})
+            texto = r.text
 
-        # 🔎 buscar bloques que contengan fechas
-        bloques = re.findall(r"(21.*?)(?=22|23|24|$)", html, re.DOTALL) + \
-                  re.findall(r"(23.*?)(?=24|$)", html, re.DOTALL) + \
-                  re.findall(r"(24.*)", html, re.DOTALL)
+            disponible = detectar_disponibilidad(texto)
 
-        for bloque in bloques:
-            for fecha in ["21", "23", "24"]:
-                if fecha in bloque:
-                    nuevo_estado = detectar_estado(bloque)
-                    viejo_estado = estado_fechas.get(fecha, "desconocido")
+            if disponible and not estado_prev[fecha]:
+                sectores = detectar_sectores(texto)
 
-                    if nuevo_estado != viejo_estado:
-                        if nuevo_estado == "disponible":
-                            mensaje = f"🚨 BTS\nENTRADAS DISPONIBLES EN FECHA {fecha} 🔥\n{URL}"
-                        elif nuevo_estado == "agotado":
-                            mensaje = f"❌ BTS\nFECHA {fecha} AGOTADA\n{URL}"
-                        else:
-                            mensaje = f"⚠️ BTS\nCAMBIO EN FECHA {fecha}\n{URL}"
+                mensaje = f"🚨 BTS\nENTRADAS DISPONIBLES - FECHA {fecha} 🔥\n"
 
-                        enviar_telegram(mensaje)
-                        print(f"Cambio en {fecha}: {viejo_estado} → {nuevo_estado}")
-                        estado_fechas[fecha] = nuevo_estado
+                if sectores:
+                    mensaje += "Sectores detectados: " + ", ".join(sectores) + "\n"
+
+                mensaje += f"Entrar acá:\n{link}"
+
+                enviar_telegram(mensaje)
+                print(f"ALERTA en {fecha}")
+
+                estado_prev[fecha] = True
+
+            elif not disponible:
+                estado_prev[fecha] = False
+                print(f"{fecha}: sin disponibilidad")
 
     except Exception as e:
         print("Error:", e)
