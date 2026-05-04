@@ -2,8 +2,8 @@ import time
 import requests
 
 # 🔐 PEGÁ TU TOKEN ENTRE LAS COMILLAS
-TOKEN = "8639882108:AAGUN2pWZgOx8M7dTORSjkPjICwbglcIYj4"
-CHAT_ID = "5261680448"
+TOKEN = os.environ.get("TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
 
 URL = "https://www.allaccess.com.ar/event/bts"
 
