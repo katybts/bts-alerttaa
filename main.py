@@ -1,7 +1,5 @@
 import time
 import requests
-
-# 🔐 PEGÁ TU TOKEN ENTRE LAS COMILLAS
 import os
 
 TOKEN = os.environ.get("TOKEN")
@@ -12,29 +10,45 @@ def enviar_telegram(msg):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.post(url, data={"chat_id": CHAT_ID, "text": msg})
 
-# 🔔 MENSAJE DE PRUEBA (para confirmar que funciona)
-enviar_telegram("✅ Bot funcionando correctamente")
+# estado anterior de cada fecha
+estado_fechas = {
+    "21": "desconocido",
+    "23": "desconocido",
+    "24": "desconocido"
+}
 
-ultimo = ""
+def detectar_estado(texto, fecha):
+    if fecha in texto:
+        if "comprar" in texto or "disponible" in texto:
+            return "disponible"
+        elif "agotado" in texto:
+            return "agotado"
+    return "sin info"
 
 while True:
     try:
         r = requests.get(URL, headers={"User-Agent": "Mozilla/5.0"})
         texto = r.text.lower()
 
-        keywords = ["21", "24", "comprar", "entradas", "disponible"]
+        for fecha in estado_fechas.keys():
+            nuevo_estado = detectar_estado(texto, fecha)
+            viejo_estado = estado_fechas[fecha]
 
-        if any(k in texto for k in keywords):
-            if texto != ultimo:
-                enviar_telegram("🚨 BTS: CAMBIO DETECTADO\nEntrá YA:\n" + URL)
-                print("ALERTA ENVIADA")
-                ultimo = texto
+            if nuevo_estado != viejo_estado:
+                if nuevo_estado == "disponible":
+                    mensaje = f"🚨 BTS\nENTRADAS DISPONIBLES EN FECHA {fecha} 🔥\n{URL}"
+                elif nuevo_estado == "agotado":
+                    mensaje = f"❌ BTS\nFECHA {fecha} AGOTADA\n{URL}"
+                else:
+                    mensaje = f"⚠️ BTS\nCAMBIO EN FECHA {fecha}\n{URL}"
+
+                enviar_telegram(mensaje)
+                print(f"Cambio en {fecha}: {viejo_estado} → {nuevo_estado}")
+                estado_fechas[fecha] = nuevo_estado
             else:
-                print("Sin cambios")
-        else:
-            print("Nada aún")
+                print(f"Sin cambios en {fecha}")
 
     except Exception as e:
         print("Error:", e)
 
-    time.sleep(300)  # ⏱ cada 5 minutos
+    time.sleep(300)
