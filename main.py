@@ -2,9 +2,10 @@ import time
 import requests
 
 # 🔐 PEGÁ TU TOKEN ENTRE LAS COMILLAS
+import os
+
 TOKEN = os.environ.get("TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
-
 URL = "https://www.allaccess.com.ar/event/bts"
 
 def enviar_telegram(msg):
